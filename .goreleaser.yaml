@@ -22,6 +22,7 @@ builds:
       - linux
       - windows
       - darwin
+    binary: ryvn
 
 archives:
   - format: tar.gz
