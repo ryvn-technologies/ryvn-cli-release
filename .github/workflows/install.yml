@@ -16,4 +16,4 @@ jobs:
 
     steps:
       - name: Test Ryvn CLI Installation
-        uses: ryvn-technologies/install-ryvn-cli@a3f830a419082f205eb1c0f361d275a9464345da
+        uses: ryvn-technologies/install-ryvn-cli@main
