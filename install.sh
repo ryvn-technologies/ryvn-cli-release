@@ -103,26 +103,44 @@ detect_platform() {
 # Check for existing installation
 check_existing_installation() {
     if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
-        local current_version
-        if current_version=$("$INSTALL_DIR/$BINARY_NAME" --version 2>/dev/null); then
-            warn "Found existing installation: $current_version"
-            read -p "Do you want to proceed with installation? [y/N] " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 0
-            fi
+        warn "Found existing installation"
+        read -p "Do you want to proceed with installation? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 0
         fi
     fi
 }
 
 # Verify installation
 verify_installation() {
+    local binary_path="$INSTALL_DIR/$BINARY_NAME"
+    
+    # Check if binary exists
+    if [ ! -f "$binary_path" ]; then
+        error "Installation verification failed: binary not found at $binary_path"
+    fi
+    
+    # Check if binary is executable
+    if [ ! -x "$binary_path" ]; then
+        error "Installation verification failed: binary is not executable"
+    fi
+    
+    # Check PATH
     if ! command_exists "$BINARY_NAME"; then
         error "Installation verification failed: binary not found in PATH"
     fi
     
-    if ! "$INSTALL_DIR/$BINARY_NAME" --version >/dev/null 2>&1; then
-        error "Installation verification failed: binary not executable or returned an error"
+    # Try running the binary without arguments to ensure it's working
+    if ! "$binary_path" > /dev/null 2>&1; then
+        local error_output
+        error_output=$("$binary_path" 2>&1)
+        # If it returns usage information, that's a success
+        if [[ "$error_output" == *"Usage"* ]] || [[ "$error_output" == *"usage"* ]]; then
+            return 0
+        fi
+        # Otherwise show the error
+        error "Installation verification failed: binary failed to execute:\n$error_output"
     fi
 }
 
