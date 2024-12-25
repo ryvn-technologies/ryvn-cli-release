@@ -117,19 +117,35 @@ check_existing_installation() {
 
 # Verify installation
 verify_installation() {
-    if ! command_exists "$BINARY_NAME"; then
-        error "Installation verification failed: binary not found in PATH"
+    local binary_path="$INSTALL_DIR/$BINARY_NAME"
+    
+    # Check if binary exists
+    if [ ! -f "$binary_path" ]; then
+        error "Installation verification failed: binary not found at $binary_path"
     fi
     
-    if ! "$INSTALL_DIR/$BINARY_NAME" --version >/dev/null 2>&1; then
-        error "Installation verification failed: binary not executable or returned an error"
+    # Check if binary is executable
+    if [ ! -x "$binary_path" ]; then
+        error "Installation verification failed: binary is not executable"
+    fi
+    
+    # Check PATH
+    if ! command_exists "$BINARY_NAME"; then
+        warn "Binary not found in PATH. You may need to add $INSTALL_DIR to your PATH"
+    fi
+    
+    # Try to execute with full path instead of relying on PATH
+    if ! "$binary_path" --version > /dev/null 2>&1; then
+        # If it fails, try to get the error message for debugging
+        local error_output
+        error_output=$("$binary_path" --version 2>&1)
+        error "Installation verification failed: binary returned an error when executing:\n$error_output"
     fi
 }
 
 main() {
     # Check for required commands
     command_exists curl || error "curl is required but not installed"
-    command_exists tar || error "tar is required but not installed"
     
     # Check if running with sudo (skip for Windows)
     if [[ "$(detect_platform)" != *"Windows"* ]] && [ "$EUID" -ne 0 ]; then
@@ -185,19 +201,29 @@ main() {
         fi
     fi
     
+    # Debug: List contents of temp directory
+    echo "Contents of temporary directory:"
+    ls -la
+    
     # Ensure install directory exists and is writable
     if [ ! -d "$INSTALL_DIR" ]; then
         mkdir -p "$INSTALL_DIR" || error "Failed to create installation directory"
     fi
     
-    # Install binary
+    # Install binary with explicit permissions
     if ! mv "$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"; then
         error "Failed to move binary to installation directory"
     fi
     
-    if ! chmod +x "$INSTALL_DIR/$BINARY_NAME"; then
-        error "Failed to make binary executable"
+    # Set permissions with more detailed error handling
+    echo "Setting executable permissions..."
+    if ! chmod 755 "$INSTALL_DIR/$BINARY_NAME"; then
+        error "Failed to set executable permissions on binary"
     fi
+    
+    # Debug: Show final binary permissions
+    echo "Final binary permissions:"
+    ls -la "$INSTALL_DIR/$BINARY_NAME"
     
     step "Verifying installation..."
     verify_installation
