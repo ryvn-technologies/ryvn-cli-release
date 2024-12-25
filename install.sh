@@ -1,16 +1,18 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 # Define variables
 GITHUB_REPO="ryvn-technologies/ryvn-cli-release"
 BINARY_NAME="ryvn"
 INSTALL_DIR="/usr/local/bin"
+TMP_DIR=""
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Print step description
@@ -18,17 +20,44 @@ step() {
     echo -e "${BLUE}==>${NC} $1"
 }
 
+# Warning message
+warn() {
+    echo -e "${YELLOW}Warning: $1${NC}" >&2
+}
+
 # Error handling
 error() {
     echo -e "${RED}Error: $1${NC}" >&2
+    cleanup
     exit 1
 }
 
+# Cleanup function
+cleanup() {
+    if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR"
+    fi
+}
+
+# Set up trap to clean up on exit
+trap cleanup EXIT
+
 # Get the latest release version from GitHub
 get_latest_version() {
-    curl --silent "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | 
+    local version
+    version=$(curl --fail --silent --max-time 10 "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | 
     grep '"tag_name":' | 
-    sed -E 's/.*"([^"]+)".*/\1/'
+    sed -E 's/.*"([^"]+)".*/\1/') || error "Failed to fetch latest version"
+    
+    if [ -z "$version" ]; then
+        error "Failed to parse version information"
+    fi
+    echo "$version"
+}
+
+# Check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
 # Detect OS and architecture
@@ -41,10 +70,7 @@ detect_platform() {
     
     # Convert architecture names
     case "$ARCH" in
-        x86_64)
-            ARCH="x86_64"
-            ;;
-        amd64)
+        x86_64|amd64)
             ARCH="x86_64"
             ;;
         arm64|aarch64)
@@ -63,6 +89,9 @@ detect_platform() {
         darwin)
             OS="Darwin"
             ;;
+        msys*|mingw*|cygwin*)
+            OS="Windows"
+            ;;
         *)
             error "Unsupported operating system: $OS"
             ;;
@@ -71,11 +100,41 @@ detect_platform() {
     echo "${OS}_${ARCH}"
 }
 
+# Check for existing installation
+check_existing_installation() {
+    if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
+        local current_version
+        if current_version=$("$INSTALL_DIR/$BINARY_NAME" --version 2>/dev/null); then
+            warn "Found existing installation: $current_version"
+            read -p "Do you want to proceed with installation? [y/N] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 0
+            fi
+        fi
+    fi
+}
+
+# Verify installation
+verify_installation() {
+    if ! command_exists "$BINARY_NAME"; then
+        error "Installation verification failed: binary not found in PATH"
+    fi
+    
+    if ! "$INSTALL_DIR/$BINARY_NAME" --version >/dev/null 2>&1; then
+        error "Installation verification failed: binary not executable or returned an error"
+    fi
+}
+
 main() {
-    # Check if running with sudo
-    if [ "$EUID" -ne 0 ]; then
+    # Check for required commands
+    command_exists curl || error "curl is required but not installed"
+    command_exists tar || error "tar is required but not installed"
+    
+    # Check if running with sudo (skip for Windows)
+    if [[ "$(detect_platform)" != *"Windows"* ]] && [ "$EUID" -ne 0 ]; then
         error "Please run with sudo"
-    }
+    fi
     
     step "Detecting platform..."
     PLATFORM=$(detect_platform)
@@ -83,37 +142,65 @@ main() {
     
     step "Getting latest version..."
     VERSION=$(get_latest_version)
-    if [ -z "$VERSION" ]; then
-        error "Failed to get latest version"
-    fi
     echo "Latest version: $VERSION"
     
-    # Construct download URL
+    check_existing_installation
+    
+    # Construct download URL with proper extension for Windows
     ARCHIVE_EXT=".tar.gz"
-    if [[ "$PLATFORM" == *"windows"* ]]; then
+    if [[ "$PLATFORM" == *"Windows"* ]]; then
         ARCHIVE_EXT=".zip"
+        command_exists unzip || error "unzip is required but not installed"
+        # For Windows, adjust the install directory if running in MSYS/MinGW
+        if [[ -n "${MSYSTEM:-}" ]]; then
+            INSTALL_DIR="/usr/bin"
+        fi
+    else
+        command_exists tar || error "tar is required but not installed"
     fi
     
     DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$VERSION/ryvn_${PLATFORM}${ARCHIVE_EXT}"
     
     step "Downloading $BINARY_NAME..."
-    TMP_DIR=$(mktemp -d)
-    curl -L --silent "$DOWNLOAD_URL" -o "$TMP_DIR/ryvn${ARCHIVE_EXT}"
+    TMP_DIR=$(mktemp -d) || error "Failed to create temporary directory"
+    echo "Downloading from: $DOWNLOAD_URL"
+    
+    # Download with progress bar
+    if ! curl -L --fail --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/ryvn${ARCHIVE_EXT}"; then
+        error "Failed to download binary"
+    fi
     
     step "Installing $BINARY_NAME..."
-    cd "$TMP_DIR"
-    if [[ "$ARCHIVE_EXT" == ".tar.gz" ]]; then
-        tar xzf "ryvn${ARCHIVE_EXT}"
+    cd "$TMP_DIR" || error "Failed to change to temporary directory"
+    
+    # Extract archive based on platform
+    if [[ "$PLATFORM" == *"Windows"* ]]; then
+        if ! unzip "ryvn${ARCHIVE_EXT}"; then
+            error "Failed to extract archive"
+        fi
+        BINARY_NAME="${BINARY_NAME}.exe"
     else
-        unzip "ryvn${ARCHIVE_EXT}"
+        if ! tar xzf "ryvn${ARCHIVE_EXT}"; then
+            error "Failed to extract archive"
+        fi
+    fi
+    
+    # Ensure install directory exists and is writable
+    if [ ! -d "$INSTALL_DIR" ]; then
+        mkdir -p "$INSTALL_DIR" || error "Failed to create installation directory"
     fi
     
     # Install binary
-    mv "$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
-    chmod +x "$INSTALL_DIR/$BINARY_NAME"
+    if ! mv "$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"; then
+        error "Failed to move binary to installation directory"
+    fi
     
-    # Cleanup
-    rm -rf "$TMP_DIR"
+    if ! chmod +x "$INSTALL_DIR/$BINARY_NAME"; then
+        error "Failed to make binary executable"
+    fi
+    
+    step "Verifying installation..."
+    verify_installation
     
     echo -e "${GREEN}Successfully installed $BINARY_NAME to $INSTALL_DIR/$BINARY_NAME${NC}"
     echo -e "Run '${BLUE}ryvn --help${NC}' to get started"
