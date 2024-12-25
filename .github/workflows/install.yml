@@ -1,0 +1,19 @@
+name: Test Ryvn CLI Installation
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+jobs:
+  test-installation:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Test Ryvn CLI Installation
+        uses: ryvn-technologies/install-ryvn-cli@e7b89155bb4eaef5e58b19ad240c11b9a519d060
