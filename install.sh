@@ -159,7 +159,7 @@ main() {
         command_exists tar || error "tar is required but not installed"
     fi
     
-    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$VERSION/ryvn_${PLATFORM}${ARCHIVE_EXT}"
+    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$VERSION/ryvn-cli-release_${PLATFORM}${ARCHIVE_EXT}"
     
     step "Downloading $BINARY_NAME..."
     TMP_DIR=$(mktemp -d) || error "Failed to create temporary directory"
