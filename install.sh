@@ -7,6 +7,7 @@ GITHUB_REPO="ryvn-technologies/ryvn-cli-release"
 BINARY_NAME="ryvn"
 INSTALL_DIR="/usr/local/bin"
 TMP_DIR=""
+VERSION="v0.8.0" # This will be automatically updated by GitHub workflow
 
 # Colors for output
 RED='\033[0;31m'
@@ -42,17 +43,9 @@ cleanup() {
 # Set up trap to clean up on exit
 trap cleanup EXIT
 
-# Get the latest release version from GitHub
+# Get the latest release version
 get_latest_version() {
-    local version
-    version=$(curl --fail --silent --max-time 10 "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | 
-    grep '"tag_name":' | 
-    sed -E 's/.*"([^"]+)".*/\1/') || error "Failed to fetch latest version"
-    
-    if [ -z "$version" ]; then
-        error "Failed to parse version information"
-    fi
-    echo "$version"
+    echo "$VERSION"
 }
 
 # Check if a command exists

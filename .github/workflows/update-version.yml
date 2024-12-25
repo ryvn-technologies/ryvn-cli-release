@@ -1,0 +1,31 @@
+name: Update Version
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Update version in install.sh
+        run: |
+          # Get the new version from the release tag
+          NEW_VERSION="${{ github.event.release.tag_name }}"
+
+          # Update the version in install.sh
+          sed -i "s/VERSION=\".*\"/VERSION=\"$NEW_VERSION\"/" install.sh
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add install.sh
+          git commit -m "chore: update version to ${{ github.event.release.tag_name }}"
+          git push
