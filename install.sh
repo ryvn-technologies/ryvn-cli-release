@@ -97,6 +97,13 @@ detect_platform() {
 check_existing_installation() {
     if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
         warn "Found existing installation"
+        
+        # Check if running in non-interactive environment (CI)
+        if [ ! -t 0 ] || [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
+            echo "Running in non-interactive environment, proceeding with installation..."
+            return 0
+        fi
+        
         read -p "Do you want to proceed with installation? [y/N] " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
