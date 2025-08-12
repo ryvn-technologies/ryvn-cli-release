@@ -10,9 +10,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.repository.default_branch }}
+          token: ${{ steps.generate-token.outputs.token }}
 
       - name: Update version in install.sh
         run: |
@@ -23,9 +31,11 @@ jobs:
           sed -i "s/VERSION=\".*\"/VERSION=\"$NEW_VERSION\"/" install.sh
 
       - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git config --local user.name "Ryvn Technologies"
           git add install.sh
           git commit -m "chore: update version to ${{ github.event.release.tag_name }}"
           git push
