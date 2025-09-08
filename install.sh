@@ -7,7 +7,7 @@ GITHUB_REPO="ryvn-technologies/ryvn-cli-release"
 BINARY_NAME="ryvn"
 INSTALL_DIR="/usr/local/bin"
 TMP_DIR=""
-VERSION="v0.51.0" # This will be automatically updated by GitHub workflow
+VERSION="v0.52.0" # This will be automatically updated by GitHub workflow
 
 # Colors for output
 RED='\033[0;31m'
