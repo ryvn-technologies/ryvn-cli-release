@@ -6,7 +6,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/ryvn-technologies/ryvn-cli-release/main/install.sh | bash
 #
 # Environment variables:
-#   INSTALL_DIR   - Custom install directory (default: ~/.ryvn/bin)
+#   INSTALL_DIR       - Custom install directory (default: ~/.ryvn/bin)
+#   RYVN_CLI_VERSION  - Release tag to install, e.g. v1.188.0 or a preview tag
+#                       (default: the latest release pinned in this script)
 #
 # Wrap everything in a function to protect against partial download.
 # If the connection drops mid-transfer, bash won't execute a truncated script.
@@ -20,6 +22,10 @@ BINARY_NAME="ryvn"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.ryvn/bin}"
 TMP_DIR=""
 VERSION="v1.188.0" # This will be automatically updated by GitHub workflow
+if [[ -n "${RYVN_CLI_VERSION:-}" ]]; then
+    # Accept a bare "1.2.3"; release tags carry a leading "v".
+    VERSION=v${RYVN_CLI_VERSION#v}
+fi
 
 # Colors (only when outputting to a terminal)
 RED='' GREEN='' BLUE='' YELLOW='' BOLD='' DIM='' NC=''
@@ -235,6 +241,7 @@ echo ""
 
 PLATFORM=$(detect_platform)
 info "  Platform: $PLATFORM"
+info "  Version:  $VERSION"
 
 # Construct download URL with proper extension for Windows
 ARCHIVE_EXT=".tar.gz"
