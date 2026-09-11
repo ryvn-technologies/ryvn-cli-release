@@ -21,7 +21,7 @@ GITHUB_REPO="ryvn-technologies/ryvn-cli-release"
 BINARY_NAME="ryvn"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.ryvn/bin}"
 TMP_DIR=""
-VERSION="v1.240.0" # This will be automatically updated by GitHub workflow
+VERSION="v1.241.0" # This will be automatically updated by GitHub workflow
 if [[ -n "${RYVN_CLI_VERSION:-}" ]]; then
     # Accept a bare "1.2.3"; release tags carry a leading "v".
     VERSION=v${RYVN_CLI_VERSION#v}
